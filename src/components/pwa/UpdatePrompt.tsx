@@ -1,49 +1,54 @@
-import { useState, useEffect } from "react";
-import { RefreshCw, WifiOff } from "lucide-react";
+import { useState } from "react";
+import { WifiOff } from "lucide-react";
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
 const UpdatePrompt = () => {
-  const [isUpdating, setIsUpdating] = useState(false);
   const [showOfflineReady, setShowOfflineReady] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  useRegisterSW({
+  const { updateServiceWorker } = useRegisterSW({
     onRegistered(r) {
-      if (r) {
-        setInterval(() => r.update(), 30 * 60 * 1000);
-      }
+      if (!r) return;
+
+      // Checa atualização imediatamente ao voltar online
+      const handleOnline = () => r.update();
+      window.addEventListener('online', handleOnline);
+
+      // Checa atualização ao trazer o app para o foreground
+      const handleVisibility = () => {
+        if (document.visibilityState === 'visible' && navigator.onLine) {
+          r.update();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibility);
+
+      // Fallback: checa a cada 30 minutos enquanto online
+      const interval = setInterval(() => {
+        if (navigator.onLine) r.update();
+      }, 30 * 60 * 1000);
+
+      // Cleanup ao desmontar (improvável, mas correto)
+      r.addEventListener('updatefound', () => {
+        // SW novo encontrado — o skipWaiting no SW cuida do resto
+      });
+
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        document.removeEventListener('visibilitychange', handleVisibility);
+        clearInterval(interval);
+      };
     },
     onRegisterError(error) {
       console.error('[PWA] Erro ao registrar SW:', error);
     },
     onOfflineReady() {
       setShowOfflineReady(true);
-      setTimeout(() => setShowOfflineReady(false), 4000);
+      setTimeout(() => setShowOfflineReady(false), 5000);
+    },
+    onNeedRefresh() {
+      // Novo SW pronto: atualiza e recarrega automaticamente
+      updateServiceWorker(true);
     },
   });
-
-  const forceUpdate = () => {
-    if (!navigator.onLine) return;
-    setIsUpdating(true);
-    if ('caches' in window) {
-      caches.keys().then((cacheNames: string[]) =>
-        Promise.all(cacheNames.map(name => caches.delete(name)))
-      ).then(() => location.reload());
-    } else {
-      location.reload();
-    }
-  };
 
   return (
     <>
@@ -54,19 +59,6 @@ const UpdatePrompt = () => {
             App pronto para uso offline
           </div>
         </div>
-      )}
-
-      {isOnline && (
-        <button
-          onClick={forceUpdate}
-          disabled={isUpdating}
-          className={`fixed bottom-4 right-4 z-40 w-12 h-12 bg-[#ffd300] text-[#0d2d6c] rounded-full shadow-lg flex items-center justify-center transition-all hover:bg-[#e6be00] hover:scale-110 ${
-            isUpdating ? 'animate-spin cursor-not-allowed' : ''
-          }`}
-          title="Forçar atualização"
-        >
-          <RefreshCw size={20} />
-        </button>
       )}
     </>
   );
