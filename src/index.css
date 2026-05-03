@@ -50,10 +50,9 @@
   }
 }
 
-/* Quando carregado dentro de iframe no Hub, esconde sidebar, header e nav mobile */
+/* Quando carregado dentro de iframe no Hub, esconde sidebar e header mas mantém nav */
 html.embedded header,
-html.embedded aside,
-html.embedded nav {
+html.embedded aside {
   display: none !important;
 }
 

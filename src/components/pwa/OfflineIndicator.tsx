@@ -3,6 +3,8 @@ import { WifiOff, CloudUpload, Check } from "lucide-react";
 import { isOnline, onOnlineStatusChange, getPendingUploadsCount } from "../../services/offlineStorage";
 import { addSyncListener, syncPendingUploads } from "../../services/syncService";
 
+type PillState = "offline" | "syncing" | "success" | "pending" | "hidden";
+
 const OfflineIndicator = () => {
   const [online, setOnline] = useState(isOnline());
   const [pendingCount, setPendingCount] = useState(0);
@@ -10,90 +12,86 @@ const OfflineIndicator = () => {
   const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
-    // Monitora status de conexão
     const unsubOnline = onOnlineStatusChange((status) => {
       setOnline(status);
-      if (status) {
-        // Atualiza contagem quando voltar online
-        getPendingUploadsCount().then(setPendingCount);
-      }
+      if (status) getPendingUploadsCount().then(setPendingCount);
     });
 
-    // Monitora sincronização
     const unsubSync = addSyncListener((isSyncing, pending) => {
       setSyncing(isSyncing);
       setPendingCount(pending);
-      
-      // Mostra sucesso quando terminar de sincronizar
       if (!isSyncing && pending === 0) {
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
       }
     });
 
-    // Carrega contagem inicial
     getPendingUploadsCount().then(setPendingCount);
 
-    return () => {
-      unsubOnline();
-      unsubSync();
-    };
+    return () => { unsubOnline(); unsubSync(); };
   }, []);
 
-  // Não mostra nada se estiver online e sem pendências
-  if (online && pendingCount === 0 && !syncing && !showSuccess) {
-    return null;
-  }
+  let state: PillState = "hidden";
+  if (showSuccess) state = "success";
+  else if (syncing) state = "syncing";
+  else if (!online) state = "offline";
+  else if (pendingCount > 0) state = "pending";
 
-  // Mostra sucesso após sincronização
-  if (showSuccess) {
-    return (
-      <div className="fixed top-14 left-0 right-0 z-40 px-4 py-2 bg-green-500 text-white text-center text-xs flex items-center justify-center gap-2 animate-slide-down">
-        <Check size={14} />
-        <span>Dados sincronizados com sucesso!</span>
-      </div>
-    );
-  }
+  if (state === "hidden") return null;
 
-  // Mostra sincronização em andamento
-  if (syncing) {
-    return (
-      <div className="fixed top-14 left-0 right-0 z-40 px-4 py-2 bg-blue-500 text-white text-center text-xs flex items-center justify-center gap-2">
-        <CloudUpload size={14} className="animate-pulse" />
-        <span>Sincronizando {pendingCount} {pendingCount === 1 ? "foto" : "fotos"}...</span>
-      </div>
-    );
-  }
+  const configs = {
+    offline: {
+      bg: "bg-orange-500",
+      hover: "",
+      icon: <WifiOff size={13} />,
+      text: `Offline${pendingCount > 0 ? ` · ${pendingCount} pendente${pendingCount > 1 ? "s" : ""}` : ""}`,
+      onClick: undefined as (() => void) | undefined,
+    },
+    syncing: {
+      bg: "bg-blue-500",
+      hover: "",
+      icon: <CloudUpload size={13} className="animate-pulse" />,
+      text: `Sincronizando ${pendingCount} ${pendingCount === 1 ? "item" : "itens"}…`,
+      onClick: undefined,
+    },
+    success: {
+      bg: "bg-green-600",
+      hover: "",
+      icon: <Check size={13} />,
+      text: "Sincronizado!",
+      onClick: undefined,
+    },
+    pending: {
+      bg: "bg-yellow-500",
+      hover: "hover:bg-yellow-600 cursor-pointer",
+      icon: <CloudUpload size={13} />,
+      text: `${pendingCount} ${pendingCount === 1 ? "item" : "itens"} · Toque para enviar`,
+      onClick: () => syncPendingUploads(),
+    },
+  };
 
-  // Mostra indicador offline
-  if (!online) {
-    return (
-      <div className="fixed top-14 left-0 right-0 z-40 px-4 py-2 bg-orange-500 text-white text-center text-xs flex items-center justify-center gap-2">
-        <WifiOff size={14} />
-        <span>
-          Modo offline
-          {pendingCount > 0 && ` • ${pendingCount} ${pendingCount === 1 ? "foto pendente" : "fotos pendentes"}`}
-        </span>
-      </div>
-    );
-  }
+  const cfg = configs[state];
 
-  // Online mas com pendências (pode acontecer se falhou antes)
-  if (pendingCount > 0) {
-    return (
-      <button
-        onClick={() => syncPendingUploads()}
-        className="fixed top-14 left-0 right-0 z-40 px-4 py-2 bg-yellow-500 text-white text-center text-xs flex items-center justify-center gap-2 cursor-pointer hover:bg-yellow-600 transition-colors"
-      >
-        <CloudUpload size={14} />
-        <span>
-          {pendingCount} {pendingCount === 1 ? "foto" : "fotos"} para sincronizar • Toque para enviar
-        </span>
-      </button>
-    );
-  }
-
-  return null;
+  return (
+    <button
+      onClick={cfg.onClick}
+      disabled={!cfg.onClick}
+      className={[
+        "fixed bottom-20 left-1/2 -translate-x-1/2 z-50",
+        "flex items-center gap-1.5 px-3 py-1.5 rounded-full shadow-lg",
+        "text-white text-xs font-medium whitespace-nowrap",
+        "transition-all duration-300 select-none",
+        cfg.bg,
+        cfg.hover,
+        !cfg.onClick && "cursor-default",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {cfg.icon}
+      <span>{cfg.text}</span>
+    </button>
+  );
 };
 
 export default OfflineIndicator;
