@@ -67,6 +67,7 @@ const TopConsumptionCard = ({ data, loading }: TopConsumptionCardProps) => {
                       className={`p-2 rounded border ${
                         index === 0 ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-200'
                       }`}
+                      title={`Placa: ${vehicle.plate || 'Não informada'}\nCondutor: ${vehicle.conductor || 'Não identificado'}`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-xs truncate flex-1">

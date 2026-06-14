@@ -9,6 +9,7 @@ export interface VehicleConsumption {
   maintenanceCount: number;
   totalCost: number;
   branch: string;
+  conductor: string;
 }
 
 export interface TopConsumptionByBranch {
@@ -35,24 +36,19 @@ export const calculateTopConsumptionByBranch = (
 
     // Agrupar consumo por veículo
     const vehicleMap = new Map<string, VehicleConsumption>();
+    const vehicleDriverCount = new Map<string, Map<string, number>>();
 
-    // Obter informações dos veículos e mapear por usuário para obter a filial
     const vehicleInfoMap = new Map<string, { model?: string; plate?: string }>();
     const userBranchMap = new Map<string, string>();
-    
-    // Mapear usuários para filiais
+    const userNameMap = new Map<string, string>();
+
     data.users.forEach(user => {
-      if (user.filial) {
-        userBranchMap.set(user.id, user.filial);
-      }
+      if (user.filial) userBranchMap.set(user.id, user.filial);
+      userNameMap.set(user.id, user.name || user.email || 'Não identificado');
     });
-    
-    // Mapear veículos
+
     data.vehicles.forEach(vehicle => {
-      vehicleInfoMap.set(vehicle.id, {
-        model: vehicle.model,
-        plate: vehicle.plate
-      });
+      vehicleInfoMap.set(vehicle.id, { model: vehicle.model, plate: vehicle.plate });
     });
 
     // Processar manutenções
@@ -69,7 +65,8 @@ export const calculateTopConsumptionByBranch = (
         fuelLiters: 0,
         maintenanceCount: 0,
         totalCost: 0,
-        branch
+        branch,
+        conductor: 'Não identificado',
       };
 
       existing.maintenanceCount += 1;
@@ -92,7 +89,8 @@ export const calculateTopConsumptionByBranch = (
         fuelLiters: 0,
         maintenanceCount: 0,
         totalCost: 0,
-        branch
+        branch,
+        conductor: 'Não identificado',
       };
 
       const liters = Number(refueling.liters) || 0;
@@ -100,7 +98,23 @@ export const calculateTopConsumptionByBranch = (
       existing.fuelLiters += liters;
       existing.totalCost += value;
 
+      // Contar abastecimentos por condutor para definir o principal
+      if (refueling.userId) {
+        const driverMap = vehicleDriverCount.get(key) || new Map<string, number>();
+        driverMap.set(refueling.userId, (driverMap.get(refueling.userId) || 0) + 1);
+        vehicleDriverCount.set(key, driverMap);
+      }
+
       vehicleMap.set(key, existing);
+    });
+
+    // Atribuir condutor principal (mais abastecimentos) a cada veículo
+    vehicleMap.forEach((consumption, key) => {
+      const driverMap = vehicleDriverCount.get(key);
+      if (driverMap && driverMap.size > 0) {
+        const topDriverId = Array.from(driverMap.entries()).sort((a, b) => b[1] - a[1])[0][0];
+        consumption.conductor = userNameMap.get(topDriverId) || 'Não identificado';
+      }
     });
 
     // Ordenar por consumo total e pegar top 3
