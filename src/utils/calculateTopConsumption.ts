@@ -44,7 +44,7 @@ export const calculateTopConsumptionByBranch = (
 
     data.users.forEach(user => {
       if (user.filial) userBranchMap.set(user.id, user.filial);
-      userNameMap.set(user.id, user.name || user.email || 'Não identificado');
+      userNameMap.set(user.id, user.name || 'Não identificado');
     });
 
     data.vehicles.forEach(vehicle => {
