@@ -466,6 +466,7 @@ export const useDashboardData = (filters?: DashboardFilters) => {
       vehicles,
       users,
       maintenances: filteredMaintenances,
+      refuelings: filteredRefuelings,
       costPerKmTimeline,
       timelineBranches,
     };

@@ -1,6 +1,7 @@
 import type { Maintenance } from "../../../../services/maintenanceService";
 import type { Vehicle } from "../../../../services/vehiclesService";
 import type { AppUser } from "../../../../services/usersService";
+import type { Refueling } from "../../../../services/refuelingService";
 
 export type DashboardFilters = {
   startDate?: string;
@@ -55,6 +56,7 @@ export type DashboardData = {
   vehicles: Vehicle[];
   users: AppUser[];
   maintenances: Maintenance[];
+  refuelings: Refueling[];
 };
 
 export type StatCardProps = {

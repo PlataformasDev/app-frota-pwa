@@ -1,5 +1,6 @@
 import type { DashboardData, DashboardFilters } from '../pages/Admin/dashboard/types/dashboard.types';
 import type { Maintenance } from '../services/maintenanceService';
+import type { Refueling } from '../services/refuelingService';
 
 export interface VehicleConsumption {
   vehicle: string;
@@ -58,9 +59,9 @@ export const calculateTopConsumptionByBranch = (
     data.maintenances.forEach((maintenance: Maintenance) => {
       const vehicleInfo = vehicleInfoMap.get(maintenance.vehicleId);
       const userBranch = userBranchMap.get(maintenance.userId);
-      
+
       if (!vehicleInfo || userBranch !== branch) return;
-      
+
       const key = maintenance.vehicleId;
       const existing = vehicleMap.get(key) || {
         vehicle: vehicleInfo.model || 'Veículo',
@@ -73,17 +74,33 @@ export const calculateTopConsumptionByBranch = (
 
       existing.maintenanceCount += 1;
       existing.totalCost += maintenance.finalCost || maintenance.forecastedCost || 0;
-      
+
       vehicleMap.set(key, existing);
     });
 
-    // Por enquanto, vamos adicionar dados simulados para combustível
-    // TODO: Integrar com dados reais de refueling quando disponíveis
-    vehicleMap.forEach((consumption) => {
-      // Simulação de dados de combustível baseada no veículo
-      const simulatedFuel = Math.floor(Math.random() * 200) + 100; // 100-300L
-      consumption.fuelLiters = simulatedFuel;
-      consumption.totalCost += simulatedFuel * 5.5; // Preço médio R$5.50/L
+    // Processar abastecimentos — inclui veículos que só têm combustível (sem manutenção)
+    (data.refuelings || []).forEach((refueling: Refueling) => {
+      const vehicleInfo = vehicleInfoMap.get(refueling.vehicleId);
+      const userBranch = userBranchMap.get(refueling.userId);
+
+      if (!vehicleInfo || userBranch !== branch) return;
+
+      const key = refueling.vehicleId;
+      const existing = vehicleMap.get(key) || {
+        vehicle: vehicleInfo.model || 'Veículo',
+        plate: vehicleInfo.plate || '',
+        fuelLiters: 0,
+        maintenanceCount: 0,
+        totalCost: 0,
+        branch
+      };
+
+      const liters = Number(refueling.liters) || 0;
+      const value = Number(refueling.value) || 0;
+      existing.fuelLiters += liters;
+      existing.totalCost += value;
+
+      vehicleMap.set(key, existing);
     });
 
     // Ordenar por consumo total e pegar top 3
